@@ -1,0 +1,37 @@
+name: Build Windows VST3
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Configure project
+        run: cmake -B build -S . -A x64
+
+      - name: Build VST3
+        run: cmake --build build --config Release --target AUTOTUNE_MQAWD_PRO_VST3
+
+      - name: Collect plugin
+        shell: pwsh
+        run: |
+          $plugin = Get-ChildItem -Path build -Directory -Filter "*.vst3" -Recurse | Select-Object -First 1
+          if (-not $plugin) {
+            Get-ChildItem -Path build -Recurse | Select-Object FullName
+            throw "VST3 bundle was not found. Check the build log."
+          }
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Compress-Archive -Path $plugin.FullName -DestinationPath "dist/AUTOTUNE_MQAWD_PRO-Windows-VST3.zip" -Force
+
+      - name: Upload VST3 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AUTOTUNE-MQAWD-PRO-Windows-VST3
+          path: dist/AUTOTUNE_MQAWD_PRO-Windows-VST3.zip
+          if-no-files-found: error
